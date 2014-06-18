@@ -22,12 +22,16 @@ function hook_balticservers_ProductEdit(array $aConfig)
     return;
   }
 
+  $aGroupConfig = DB::fetchRow('tblproductconfiggroups', array('name' => $aConfig['name']));
+
+  if (empty($aGroupConfig) === FALSE) {
+    return;
+  }
+
   $oApi = new Api();
 
   $iProductId = (int) $aConfig['pid'];
   $aParams    = Api::translateConfig($aConfig);
-
-  Macro::deleteConfigOptionByName($aConfig['name']);
 
   $aOptionList = $oApi->getServerPlanCustomization($aParams['sPlanName']);
   $iGroupId    = insert_query('tblproductconfiggroups', array('name' => $aConfig['name']));
