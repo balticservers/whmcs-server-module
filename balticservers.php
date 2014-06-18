@@ -59,6 +59,29 @@ function balticservers_ConfigOptions()
  *
  * @return string
  */
+function balticservers_SuspendAccount(array $aConfig)
+{
+  $oApi    = new Api($aConfig);
+  $aParams = array(
+              'iWhmcsSid' => (int) $aConfig['serviceid'],
+              'iUserId'   => (int) $aConfig['clientsdetails']['userid'],
+              'sReason'   => $aConfig['suspendreason']
+             );
+
+  $aResponse = $oApi->call('whmcsSuspendServer', $aParams);
+
+  return $oApi->getResult($aResponse);
+
+}//end balticservers_SuspendAccount()
+
+
+/**
+ * WHMCS function.
+ *
+ * @param array $aConfig WHMCS configuration values.
+ *
+ * @return string
+ */
 function balticservers_CreateAccount(array $aConfig)
 {
   $aResponse = array();
