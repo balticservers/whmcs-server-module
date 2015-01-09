@@ -7,8 +7,6 @@
  * @version   $Id: $
  */
 
-require_once 'DB.php';
-
 /**
  * Macro class.
  */
@@ -80,20 +78,67 @@ class Macro
   /**
    * Sets user name.
    *
-   * @param string  $sUserName Server login user name.
-   * @param integer $iWhmcsSid Order / service id.
+   * @param string  $sUserName  Server login user name.
+   * @param integer $iServiceId Service id.
    *
    * @return void
    */
-  public static function setServerUsername($sUserName, $iWhmcsSid)
+  public static function setServiceUsername($sUserName, $iServiceId)
   {
     update_query(
       'tblhosting',
       array('username' => $sUserName),
-      array('id' => $iWhmcsSid)
+      array('id' => $iServiceId)
     );
 
-  }//end setServerUsername()
+  }//end setServiceUsername()
+
+
+  /**
+   * Sets server package id.
+   *
+   * @param integer $iSrvPackageId Server package id.
+   * @param integer $iServiceId    Service id.
+   * @param integer $iProductId    Product id.
+   *
+   * @return void
+   */
+  public static function setSrvPackageId($iSrvPackageId, $iServiceId, $iProductId)
+  {
+    $aField = DB::fetchRow(
+      'tblcustomfields',
+      array('relid' => $iProductId)
+    );
+
+    $aValue = DB::fetchRow(
+      'tblcustomfieldsvalues',
+      array(
+       'relid'   => $relid,
+       'fieldid' => (int) $aField['id']
+      )
+    );
+
+    if ($aValue === FALSE) {
+      insert_query(
+        'tblcustomfieldsvalues',
+        array(
+         'relid'   => $iServiceId,
+         'fieldid' => (int) $aField['id'],
+         'value'   => $iSrvPackageId
+        )
+      );
+    } else {
+      update_query(
+        'tblcustomfieldsvalues',
+        array('value' => $iSrvPackageId),
+        array(
+         'relid'   => $iServiceId,
+         'fieldid' => (int) $aField['id']
+        )
+      );
+    }//end if
+
+  }//end setSrvPackageId()
 
 
 }//end class

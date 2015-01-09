@@ -28,13 +28,31 @@ function hook_balticservers_ProductEdit(array $aConfig)
     return;
   }
 
-  $oApi = new Api();
-
+  $oApi       = new Api();
   $iProductId = (int) $aConfig['pid'];
-  $aParams    = Api::translateConfig($aConfig);
 
+  // Custom field: server package id.
+  insert_query(
+    'tblcustomfields',
+    array(
+     'type'        => 'product',
+     'fieldname'   => 'iSrvPackageId',
+     'relid'       => $iProductId,
+     'fieldtype'   => 'text',
+     'description' => 'System required field',
+     'regexpr'     => '[0-9]+',
+     'adminonly'   => 'on'
+    )
+  );
+
+  $aParams     = $oApi->translateConfig($aConfig);
   $aOptionList = $oApi->getServerPlanCustomization($aParams['sPlanName']);
-  $iGroupId    = insert_query('tblproductconfiggroups', array('name' => $aConfig['name']));
+
+  if (empty($aOptionList) === TRUE) {
+    return;
+  }
+
+  $iGroupId = insert_query('tblproductconfiggroups', array('name' => $aConfig['name']));
 
   foreach ($aOptionList as $aOption) {
     $iOptionId = insert_query(

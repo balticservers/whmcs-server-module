@@ -32,14 +32,7 @@ class Api
    *
    * @var string
    */
-  private $_sUrl = 'https://my.balticservers.com/korys/api/';
-
-  /**
-   * Environment.
-   *
-   * @var string
-   */
-  private $_sMode = 'prod';
+  private $_sUrl = 'http://korys/korys/api/';
 
 
   /**
@@ -81,7 +74,7 @@ class Api
                  CURLOPT_SSL_VERIFYPEER => TRUE,
                  CURLOPT_POST           => TRUE,
                  CURLOPT_POSTFIELDS     => json_encode($aParams),
-                 CURLOPT_TIMEOUT        => 0,
+                 CURLOPT_TIMEOUT        => 10,
                  CURLOPT_HTTPHEADER     => array('Content-type: application/json'),
                  CURLOPT_USERPWD        => $sAuth,
                  CURLOPT_HTTPAUTH       => CURLAUTH_BASIC
@@ -93,10 +86,6 @@ class Api
     $data = json_decode($json, TRUE);
 
     curl_close($ch);
-
-    if ($data === NULL && $this->_sMode === 'dev') {
-      die(var_export('JSON parse err: '.$json));
-    }
 
     return $data;
 
@@ -112,7 +101,7 @@ class Api
    */
   public function serverProductString($sLang)
   {
-    $aResponse = $this->call('getServerProductNameList', array('sLanguage' => $sLang));
+    $aResponse = $this->call('getServerPlanList', array());
 
     if ($aResponse['bSuccess'] === TRUE) {
       return implode(',', $aResponse['aResult']);
@@ -124,49 +113,13 @@ class Api
 
 
   /**
-   * Convert period list into comma separated line.
-   *
-   * @return string
-   */
-  public function monthPeriodsString()
-  {
-    $aResponse = $this->call('getAvailableMonthPeriodList');
-
-    if ($aResponse['bSuccess'] === TRUE) {
-      return implode(',', $aResponse['aResult']);
-    }
-
-    return '';
-
-  }//end monthPeriodsString()
-
-
-  /**
-   * Convert currency list into comma separated line.
-   *
-   * @return string
-   */
-  public function availableCurrencyString()
-  {
-    $aResponse = $this->call('getAvailableCurrencyList');
-
-    if ($aResponse['bSuccess'] === TRUE) {
-      return implode(',', $aResponse['aResult']);
-    }
-
-    return '';
-
-  }//end availableCurrencyString()
-
-
-  /**
    * WHMCS response to end client.
    *
    * @param array $aResponse API response.
    *
    * @return string
    */
-  public function getResult(array $aResponse)
+  public static function getResult(array $aResponse)
   {
     if (empty($aResponse) === TRUE) {
       return 'Unexpected error.';
@@ -216,19 +169,30 @@ class Api
    *
    * @return string
    */
-  public static function translateConfig(array $aConfig)
+  public function translateConfig(array $aConfig)
   {
     $aParams = array();
 
-    $aParams['sPlanName']   = $aConfig['configoption3'];
-    $aParams['sCurrency']   = $aConfig['configoption5'];
-    $aParams['sCouponCode'] = $aConfig['configoption6'];
-    $aParams['iMonths']     = $aConfig['configoption4'];
-    $aParams['sLanguage']   = 'en';
+    $aParams['sPlanName'] = $aConfig['configoption3'];
+    $aParams['iPlanID']   = $aConfig['configoption3'];
 
-    $aParams['sHostName'] = $aConfig['domain'];
-    $aParams['iWhmcsSid'] = $aConfig['serviceid'];
-    $aParams['iUserId']   = $aConfig['clientsdetails']['userid'];
+    if (isset($aConfig['serviceid']) === TRUE) {
+      $aParams['iServiceId'] = (int) $aConfig['serviceid'];
+      $aParams['iProductId'] = (int) $aConfig['pid'];
+
+      $aHosting = DB::fetchRow('tblhosting', array('id' => $aParams['iServiceId']));
+      $iCycleId = Tools::parseCycleId($aHosting['billingcycle']);
+
+      $aVariants = array_filter($aConfig['configoptions'], 'trim');
+      $aVariants = $this->parsePlanVariantIds($aParams['iPlanID'], array_values($aVariants));
+
+      $aParams['iCycleID']  = $iCycleId;
+      $aParams['aVariants'] = $aVariants;
+    }//end if
+
+    if (isset($aConfig['customfields']['iSrvPackageId']) === TRUE) {
+      $aParams['iSrvPackageId'] = (int) $aConfig['customfields']['iSrvPackageId'];
+    }
 
     return $aParams;
 
@@ -267,24 +231,6 @@ class Api
     return $aParams;
 
   }//end getContactBlock()
-
-
-  /**
-   * Server options block.
-   *
-   * @param array $aConfig WHMCS configuration values.
-   *
-   * @return string
-   */
-  public function getOptionsBlock(array $aConfig)
-  {
-    $aParams = array_merge($aConfig['configoptions'], $aConfig['customfields']);
-    $aParams = array_filter($aParams, 'trim');
-    $aParams = array_values($aParams);
-
-    return $aParams;
-
-  }//end getOptionsBlock()
 
 
   /**
@@ -327,6 +273,56 @@ class Api
     return FALSE;
 
   }//end availableInStock()
+
+
+  /**
+   * Get API request results.
+   *
+   * @param array $aResponse API response.
+   *
+   * @return array
+   */
+  public static function getData(array $aResponse)
+  {
+    if (empty($aResponse['aResult']) === FALSE) {
+      return $aResponse['aResult'];
+    }
+
+    return array();
+
+  }//end getData()
+
+
+  /**
+   * Converts variants names to ids.
+   *
+   * @param integer $iPlanId   Server plan ID or plan name.
+   * @param array   $aVariants Variant names.
+   *
+   * @return array
+   */
+  public function parsePlanVariantIds($iPlanId, array $aVariants)
+  {
+    $aResponse = $this->call('getServerPlanDetails', array('iPlanID' => $iPlanId));
+
+    if (empty($aResponse) === TRUE || $aResponse['bSuccess'] === FALSE) {
+      return array();
+    }
+
+    $aVariants   = array_map('strtolower', $aVariants);
+    $aVariantIds = array();
+
+    foreach ($aResponse['aResult']['aOptions'] as $aOption) {
+      foreach ($aOption as $aVariant) {
+        if (in_array(strtolower($aVariant['sName']), $aVariants) === TRUE) {
+          $aVariantIds[] = (int) $aVariant['iVariantId'];
+        }
+      }
+    }
+
+    return $aVariantIds;
+
+  }//end parsePlanVariantIds()
 
 
 }//end class

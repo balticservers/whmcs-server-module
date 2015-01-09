@@ -1,6 +1,9 @@
 <?php
 
 require_once 'Api.php';
+require_once 'Macro.php';
+require_once 'DB.php';
+require_once 'Tools.php';
 
 
 /**
@@ -33,20 +36,6 @@ function balticservers_ConfigOptions()
                 'Options'      => $oApi->serverProductString('en')
                );
 
-  $aConfig[] = array(
-                'FriendlyName' => 'Period',
-                'Type'         => 'dropdown',
-                'Description'  => 'Select month period.',
-                'Options'      => $oApi->monthPeriodsString()
-               );
-
-  $aConfig[] = array(
-                'FriendlyName' => 'Currency',
-                'Type'         => 'dropdown',
-                'Description'  => 'Select currency you want to order product.',
-                'Options'      => $oApi->availableCurrencyString()
-               );
-
   return $aConfig;
 
 }//end balticservers_ConfigOptions()
@@ -62,15 +51,13 @@ function balticservers_ConfigOptions()
 function balticservers_SuspendAccount(array $aConfig)
 {
   $oApi    = new Api($aConfig);
-  $aParams = array(
-              'iWhmcsSid' => (int) $aConfig['serviceid'],
-              'iUserId'   => (int) $aConfig['clientsdetails']['userid'],
-              'sReason'   => $aConfig['suspendreason']
-             );
+  $aParams = array();
 
-  $aResponse = $oApi->call('whmcsSuspendServer', $aParams);
+  $aParams['iPackageId'] = (int) $aConfig['customfields']['iSrvPackageId'];
 
-  return $oApi->getResult($aResponse);
+  $aResponse = $oApi->call('suspendServer', $aParams);
+
+  return Api::getResult($aResponse);
 
 }//end balticservers_SuspendAccount()
 
@@ -84,28 +71,19 @@ function balticservers_SuspendAccount(array $aConfig)
  */
 function balticservers_CreateAccount(array $aConfig)
 {
-  $aResponse = array();
   $oApi      = new Api($aConfig);
-  $aParams   = Api::translateConfig($aConfig);
+  $aParams   = $oApi->translateConfig($aConfig);
+  $aResponse = $oApi->call('orderServerPlan', $aParams);
 
-  $aParams['sNewPassword'] = $aConfig['password'];
-  $aParams['aContact']     = $oApi->getContactBlock($aConfig);
-  $aParams['aOptions']     = $oApi->getOptionsBlock($aConfig);
+  if ($aResponse['bSuccess'] === TRUE) {
+    $iSrvPackageId = (int) $aResponse['aResult']['aPackageIDs'][0];
+    $iServiceId    = (int) $aParams['iServiceId'];
+    $iProductId    = (int) $aParams['iProductId'];
 
-  if ($aConfig['producttype'] === 'server') {
-    $aResponse = $oApi->call('whmcsServerOrder', $aParams);
-  }
+    Macro::setSrvPackageId($iSrvPackageId, $iServiceId, $iProductId);
+  }//end if
 
-  if (empty($aResponse) === FALSE) {
-    if ($aResponse['bSuccess'] === TRUE) {
-      Macro::updateServiceIpSet($aResponse['aResult']['aIPAddress'], $aParams['iWhmcsSid']);
-      Macro::setServerUsername('root', $aParams['iWhmcsSid']);
-    }
-
-    return $oApi->getResult($aResponse);
-  }
-
-  return 'Product type is not supported.';
+  return Api::getResult($aResponse);
 
 }//end balticservers_CreateAccount()
 
@@ -119,22 +97,24 @@ function balticservers_CreateAccount(array $aConfig)
  */
 function balticservers_ClientAreaCustomButtonArray(array $aConfig)
 {
-  $oApi = new Api($aConfig);
+  $oApi      = new Api($aConfig);
+  $aParams   = array('iPackageId' => (int) $aConfig['customfields']['iSrvPackageId']);
+  $aResponse = $oApi->call('getServerStatus', $aParams);
 
-  $aCmdList = array();
-
-  $aCmdList['reboot']        = 'Restart server';
-  $aCmdList['rebuild']       = 'Rebuild server';
-  $aCmdList['ipTablesFlush'] = 'Flush IP tables';
-  $aCmdList['start']         = 'Start server';
-  $aCmdList['stop']          = 'Stop server';
+  if ((bool) $aResponse['bSuccess'] === FALSE) {
+    return array();
+  }
 
   $aCommands = array();
-  $iWhmcsSid = (int) $aConfig['serviceid'];
-  $iUserId   = (int) $aConfig['clientsdetails']['userid'];
+  $sStatus   = $aResponse['aResult']['sStatus'];
 
-  foreach ($oApi->getServerCommands($iWhmcsSid, $iUserId) as $sCommand) {
-    $aCommands[$aCmdList[$sCommand]] = $sCommand;
+  if ($sStatus === 'running' || $sStatus === 'on') {
+    $aCommands['Stop server']     = 'stop';
+    $aCommands['Flush IP tables'] = 'ipTablesFlush';
+    $aCommands['Rebuild server']  = 'rebuild';
+    $aCommands['Reboot server']   = 'reboot';
+  } else if ($sStatus !== 'unknown' && $sStatus !== 'suspended') {
+    $aCommands['Start server'] = 'start';
   }
 
   return $aCommands;
@@ -152,14 +132,13 @@ function balticservers_ClientAreaCustomButtonArray(array $aConfig)
 function balticservers_reboot(array $aConfig)
 {
   $oApi    = new Api($aConfig);
-  $aParams = array(
-              'iWhmcsSid' => (int) $aConfig['serviceid'],
-              'iUserId'   => (int) $aConfig['clientsdetails']['userid']
-             );
+  $aParams = array();
 
-  $aResponse = $oApi->call('whmcsServerRestart', $aParams);
+  $aParams['iPackageId'] = (int) $aConfig['customfields']['iSrvPackageId'];
 
-  return $oApi->getResult($aResponse);
+  $aResponse = $oApi->call('restartServer', $aParams);
+
+  return Api::getResult($aResponse);
 
 }//end balticservers_reboot()
 
@@ -174,14 +153,13 @@ function balticservers_reboot(array $aConfig)
 function balticservers_start(array $aConfig)
 {
   $oApi    = new Api($aConfig);
-  $aParams = array(
-              'iWhmcsSid' => (int) $aConfig['serviceid'],
-              'iUserId'   => (int) $aConfig['clientsdetails']['userid']
-             );
+  $aParams = array();
 
-  $aResponse = $oApi->call('whmcsServerStart', $aParams);
+  $aParams['iPackageId'] = (int) $aConfig['customfields']['iSrvPackageId'];
 
-  return $oApi->getResult($aResponse);
+  $aResponse = $oApi->call('startServer', $aParams);
+
+  return Api::getResult($aResponse);
 
 }//end balticservers_start()
 
@@ -196,14 +174,13 @@ function balticservers_start(array $aConfig)
 function balticservers_stop(array $aConfig)
 {
   $oApi    = new Api($aConfig);
-  $aParams = array(
-              'iWhmcsSid' => (int) $aConfig['serviceid'],
-              'iUserId'   => (int) $aConfig['clientsdetails']['userid']
-             );
+  $aParams = array();
 
-  $aResponse = $oApi->call('whmcsServerStop', $aParams);
+  $aParams['iPackageId'] = (int) $aConfig['customfields']['iSrvPackageId'];
 
-  return $oApi->getResult($aResponse);
+  $aResponse = $oApi->call('stopServer', $aParams);
+
+  return Api::getResult($aResponse);
 
 }//end balticservers_stop()
 
@@ -218,14 +195,14 @@ function balticservers_stop(array $aConfig)
 function balticservers_rebuild(array $aConfig)
 {
   $oApi    = new Api($aConfig);
-  $aParams = Api::translateConfig($aConfig);
+  $aParams = array();
 
-  // TODO: Encrypt password.
   $aParams['sNewPassword'] = $aConfig['password'];
+  $aParams['iPackageId']   = (int) $aConfig['customfields']['iSrvPackageId'];
 
-  $aResponse = $oApi->call('whmcsServerRebuild', $aParams);
+  $aResponse = $oApi->call('rebuildServer', $aParams);
 
-  return $oApi->getResult($aResponse);
+  return Api::getResult($aResponse);
 
 }//end balticservers_rebuild()
 
@@ -239,11 +216,14 @@ function balticservers_rebuild(array $aConfig)
  */
 function balticservers_ipTablesFlush(array $aConfig)
 {
-  $oApi      = new Api($aConfig);
-  $aParams   = Api::translateConfig($aConfig);
-  $aResponse = $oApi->call('whmcsServerIpTableFlush', $aParams);
+  $oApi    = new Api($aConfig);
+  $aParams = array();
 
-  return $oApi->getResult($aResponse);
+  $aParams['iPackageId'] = (int) $aConfig['customfields']['iSrvPackageId'];
+
+  $aResponse = $oApi->call('flushServerIpTable', $aParams);
+
+  return Api::getResult($aResponse);
 
 }//end balticservers_ipTablesFlush()
 
@@ -258,20 +238,20 @@ function balticservers_ipTablesFlush(array $aConfig)
 function balticservers_ChangePassword(array $aConfig)
 {
   $oApi    = new Api($aConfig);
-  $aParams = Api::translateConfig($aConfig);
+  $aParams = array();
 
-  // TODO: Encrypt password.
   $aParams['sNewPassword'] = $aConfig['password'];
+  $aParams['iPackageId']   = (int) $aConfig['customfields']['iSrvPackageId'];
 
-  $aResponse = $oApi->call('whmcsServerSetPwd', $aParams);
+  $aResponse = $oApi->call('changeServerPassword', $aParams);
 
-  return $oApi->getResult($aResponse);
+  return Api::getResult($aResponse);
 
 }//end balticservers_ChangePassword()
 
 
 /**
- * Cancel or fraud invoice.
+ * Terminates package.
  *
  * @param array $aConfig WHMCS configuration values.
  *
@@ -279,11 +259,16 @@ function balticservers_ChangePassword(array $aConfig)
  */
 function balticservers_TerminateAccount(array $aConfig)
 {
-  $oApi      = new Api($aConfig);
-  $aParams   = Api::translateConfig($aConfig);
-  $aResponse = $oApi->call('whmcsCancelInvoice', $aParams);
+  $oApi   = new Api($aConfig);
+  $iPckId = (int) $aConfig['customfields']['iSrvPackageId'];
+  $aRes   = $oApi->call('suspendServer', array('iPackageId' => $iPckId));
 
-  return $oApi->getResult($aResponse);
+  if ((bool) $aRes['bSuccess'] === TRUE) {
+    $aParams = array('aPackageIDs' => array((int) $aConfig['customfields']['iSrvPackageId']));
+    $aRes    = $oApi->call('stopPackagesInvoiceRenewal', $aParams);
+  }
+
+  return Api::getResult($aRes);
 
 }//end balticservers_TerminateAccount()
 

@@ -7,8 +7,6 @@
  * @version   $Id: $
  */
 
-require_once 'DB.php';
-
 /**
  * Tools class.
  */
@@ -45,6 +43,66 @@ class Tools
     return FALSE;
 
   }//end convertCurrency()
+
+
+  /**
+   * Text to cycle id. Cycles are constants.
+   *
+   * @param string $sText Period in word.
+   *
+   * @return integer
+   */
+  public static function parseCycleId($sText)
+  {
+    $sText = trim(strtolower($sText));
+
+    if (strpos($sText, 'monthly') !== FALSE) {
+      return 3;
+    }
+
+    if (strpos($sText, 'quarterly') !== FALSE) {
+      return 4;
+    }
+
+    if (strpos($sText, 'semi-annually') !== FALSE) {
+      return 5;
+    }
+
+    if (strpos($sText, 'annually') !== FALSE
+        || strpos($sText, 'biennially') !== FALSE
+        || strpos($sText, 'triennially') !== FALSE
+    ) {
+      return 6;
+    }
+
+    return 3;
+
+  }//end parseCycleId()
+
+
+  /**
+   * Cycle id to months.
+   *
+   * @param integer $iCycleId Cycle id.
+   *
+   * @return integer
+   */
+  public static function cycleIdToMonths($iCycleId)
+  {
+    $aMonths = array(
+                3 => 1,
+                4 => 3,
+                5 => 6,
+                6 => 12
+               );
+
+    if (isset($aMonths[$iCycleId]) === FALSE) {
+      return 1;
+    }
+
+    return $aMonths[$iCycleId];
+
+  }//end cycleIdToMonths()
 
 
 }//end class
