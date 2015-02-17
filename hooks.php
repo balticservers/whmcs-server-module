@@ -31,19 +31,30 @@ function hook_balticservers_ProductEdit(array $aConfig)
   $oApi       = new Api();
   $iProductId = (int) $aConfig['pid'];
 
-  // Custom field: server package id.
-  insert_query(
+  $aSrvPck = DB::fetchRow(
     'tblcustomfields',
     array(
-     'type'        => 'product',
-     'fieldname'   => 'iSrvPackageId',
-     'relid'       => $iProductId,
-     'fieldtype'   => 'text',
-     'description' => 'System required field',
-     'regexpr'     => '[0-9]+',
-     'adminonly'   => 'on'
+     'relid'     => $iProductId,
+     'type'      => 'product',
+     'fieldname' => 'iSrvPackageId'
     )
   );
+
+  if (empty($aSrvPck) === TRUE) {
+    // Custom field: server package id.
+    insert_query(
+      'tblcustomfields',
+      array(
+       'type'        => 'product',
+       'fieldname'   => 'iSrvPackageId',
+       'relid'       => $iProductId,
+       'fieldtype'   => 'text',
+       'description' => 'System required field',
+       'regexpr'     => '[0-9]+',
+       'adminonly'   => 'on'
+      )
+    );
+  }
 
   $aParams     = $oApi->translateConfig($aConfig);
   $aOptionList = $oApi->getServerPlanCustomization($aParams['sPlanName']);
