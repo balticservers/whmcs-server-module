@@ -32,7 +32,7 @@ class Api
    *
    * @var string
    */
-  private $_sUrl = 'http://korys/korys/api/';
+  private $_sUrl = 'https://my.balticservers.com/korys/api/';
 
 
   /**
