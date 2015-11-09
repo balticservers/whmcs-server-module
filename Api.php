@@ -85,6 +85,10 @@ class Api
     $json = curl_exec($ch);
     $data = json_decode($json, TRUE);
 
+    if ($data === NULL) {
+      $data = array();
+    }
+
     curl_close($ch);
 
     return $data;
