@@ -137,7 +137,7 @@ function hook_balticservers_ShoppingCartValidateProductUpdate(array $aItem)
   }
 
   $oApi    = new Api();
-  $aParams = Api::translateConfig($aProduct);
+  $aParams = $oApi->translateConfig($aProduct);
 
   if ($oApi->availableInStock($aParams['sPlanName']) === FALSE) {
     return $aProduct['name'].' is out of stock.';
