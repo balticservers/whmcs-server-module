@@ -318,8 +318,11 @@ class Api
 
     foreach ($aResponse['aResult']['aOptions'] as $aOption) {
       foreach ($aOption as $aVariant) {
-        if (in_array(strtolower($aVariant['sName']), $aVariants) === TRUE) {
+        $mKey = array_search(strtolower($aVariant['sName']), $aVariants);
+
+        if ($mKey !== FALSE) {
           $aVariantIds[] = (int) $aVariant['iVariantId'];
+          unset($aVariants[$mKey]);
         }
       }
     }

@@ -64,16 +64,31 @@ function hook_balticservers_ProductEdit(array $aConfig)
   }
 
   $iGroupId = insert_query('tblproductconfiggroups', array('name' => $aConfig['name']));
+  $aOptions = array();
 
   foreach ($aOptionList as $aOption) {
+    $i = 1;
+
+    do {
+      if ($i === 1) {
+        $sTempOptionName = $aOption['sName'];
+      } else {
+        $sTempOptionName = $aOption['sName'].$i;
+      }
+
+      $i++;
+    } while (in_array($sTempOptionName, $aOptions) === TRUE);
+
     $iOptionId = insert_query(
       'tblproductconfigoptions',
       array(
        'gid'        => $iGroupId,
-       'optionname' => $aOption['sName'],
+       'optionname' => $sTempOptionName,
        'optiontype' => 1
       )
     );
+
+    $aOptions[] = $sTempOptionName;
 
     foreach ($aOption['aVariants'] as $aVariant) {
       $iSubId = insert_query(
