@@ -1,12 +1,6 @@
 <?php
 
-require_once 'Api.php';
-require_once 'Macro.php';
-require_once 'DB.php';
-require_once 'Tools.php';
-
 add_hook('ProductEdit', 1, 'hook_balticservers_ProductEdit');
-add_hook('ShoppingCartValidateProductUpdate', 1, 'hook_balticservers_ShoppingCartValidateProductUpdate');
 
 
 /**
@@ -22,6 +16,13 @@ function hook_balticservers_ProductEdit(array $aConfig)
     return;
   }
 
+  $sPath = dirname(__FILE__).'/';
+
+  require_once $sPath.'Api.php';
+  require_once $sPath.'Macro.php';
+  require_once $sPath.'DB.php';
+  require_once $sPath.'Tools.php';
+  
   $aGroupConfig = DB::fetchRow('tblproductconfiggroups', array('name' => $aConfig['name']));
 
   if (empty($aGroupConfig) === FALSE) {
@@ -134,31 +135,6 @@ function hook_balticservers_ProductEdit(array $aConfig)
   );
 
 }//end hook_balticservers_ProductEdit()
-
-
-/**
- * Runs after updating cart, can use global $errormessage to pass back error.
- *
- * @param array $aItem Cart item.
- *
- * @return string
- */
-function hook_balticservers_ShoppingCartValidateProductUpdate(array $aItem)
-{
-  $aProduct = DB::fetchRow('tblproducts', array('id' => $GLOBALS['pid']));
-
-  if (strtolower($aProduct['servertype']) !== 'balticservers') {
-    return '';
-  }
-
-  $oApi    = new Api();
-  $aParams = $oApi->translateConfig($aProduct);
-
-  if ($oApi->availableInStock($aParams['sPlanName']) === FALSE) {
-    return $aProduct['name'].' is out of stock.';
-  }
-
-}//end hook_balticservers_ShoppingCartValidateProductUpdate()
 
 
 ?>
