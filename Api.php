@@ -184,13 +184,27 @@ class Api
       $aParams['iServiceId'] = (int) $aConfig['serviceid'];
       $aParams['iProductId'] = (int) $aConfig['pid'];
 
-      $aHosting = DB::fetchRow('tblhosting', array('id' => $aParams['iServiceId']));
-      $iCycleId = Tools::parseCycleId($aHosting['billingcycle']);
+      $aHosting = mysql_fetch_array(select_query('tblhosting', '*', array('id' => $aParams['iServiceId'])));
+      $sText    = trim(strtolower($aHosting['billingcycle']));
+
+      if (strpos($sText, 'monthly') !== FALSE) {
+        $aParams['iCycleID'] = 3;
+      } else if (strpos($sText, 'quarterly') !== FALSE) {
+        $aParams['iCycleID'] = 4;
+      } else if (strpos($sText, 'semi-annually') !== FALSE) {
+        $aParams['iCycleID'] = 5;
+      } else if (strpos($sText, 'annually') !== FALSE
+          || strpos($sText, 'biennially') !== FALSE
+          || strpos($sText, 'triennially') !== FALSE
+      ) {
+        $aParams['iCycleID'] = 6;
+      } else {
+        $aParams['iCycleID'] = 3;
+      }
 
       $aVariants = array_filter($aConfig['configoptions'], 'trim');
       $aVariants = $this->parsePlanVariantIds($aParams['iPlanID'], array_values($aVariants));
 
-      $aParams['iCycleID']  = $iCycleId;
       $aParams['aVariants'] = $aVariants;
     }//end if
 
