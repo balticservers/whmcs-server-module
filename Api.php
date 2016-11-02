@@ -327,12 +327,16 @@ class Api
       return array();
     }
 
-    $aVariants   = array_map('strtolower', $aVariants);
+    foreach ($aVariants as &$sVariant) {
+      $sVariant = self::formatVariant($sVariant);
+    }
+
     $aVariantIds = array();
 
     foreach ($aResponse['aResult']['aOptions'] as $aOption) {
       foreach ($aOption as $aVariant) {
-        $mKey = array_search(strtolower($aVariant['sName']), $aVariants);
+        $sName = self::formatVariant($aVariant['sName']);
+        $mKey  = array_search($sName, $aVariants);
 
         if ($mKey !== FALSE) {
           $aVariantIds[] = (int) $aVariant['iVariantId'];
@@ -346,6 +350,26 @@ class Api
   }//end parsePlanVariantIds()
 
 
+  /**
+   * Formats text to compare later on.
+   *
+   * @param string $sVariant Variant name.
+   *
+   * @return string
+   */
+  public static function formatVariant($sVariant)
+  {
+    $sVariant = trim($sVariant);
+    $sVariant = strtolower($sVariant);
+    $sVariant = strip_tags($sVariant);
+    $sVariant = preg_replace('/(™|®|©|&trade;|&reg;|&copy;|&#8482;|&#174;|&#169;)/', '', $sVariant);
+
+    return $sVariant;
+
+  }//end formatVariant()
+
+
 }//end class
+
 
 ?>
